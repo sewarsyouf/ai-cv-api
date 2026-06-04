@@ -870,27 +870,9 @@ def extract_experience_info(text):
 class MLScorer:
 
     def __init__(self):
-
-        logger.info("Loading NLP Models...")
-
-        self.embedder = SentenceTransformer(Config.EMBEDDING_MODEL)
-        self.cross_encoder = CrossEncoder(Config.CROSS_ENCODER_MODEL)
-
-        logger.info("Models Loaded.")
-
-    def sigmoid(self, x):
-        return 1 / (1 + math.exp(-x))
+        logger.info("Lightweight scorer loaded.")
 
     def evaluate(self, cv_text, cv_skills, cv_years, job_desc):
-
-        cv_emb = self.embedder.encode([cv_text])
-        job_emb = self.embedder.encode([job_desc])
-
-        semantic_score = float(cosine_similarity(cv_emb, job_emb)[0][0])
-        semantic_score = max(0.0, semantic_score)
-
-        cross_logit = self.cross_encoder.predict([(cv_text, job_desc)])[0]
-        cross_score = self.sigmoid(float(cross_logit))
 
         job_skills = set(Extractor().extract_skills(job_desc))
         cv_skills = set(cv_skills)
@@ -911,6 +893,16 @@ class MLScorer:
         skill_score = len(matched_skill_ids) / len(job_skills) if job_skills else 0.0
         exp_score = min(cv_years / 10.0, 1.0)
 
+        cv_words = set(cv_text.lower().split())
+        job_words = set(job_desc.lower().split())
+
+        semantic_score = (
+            len(cv_words & job_words) / len(job_words)
+            if job_words else 0.0
+        )
+
+        cross_score = semantic_score
+
         final_score = (
             semantic_score * Config.WEIGHTS["semantic"] +
             cross_score * Config.WEIGHTS["cross_encoder"] +
@@ -927,8 +919,6 @@ class MLScorer:
             "matched_skill_names": matched_skill_names,
             "missing_skill_names": missing_skill_names
         }
-
-
 # =========================================================
 # ATS SYSTEM
 # =========================================================
