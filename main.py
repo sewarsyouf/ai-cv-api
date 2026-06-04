@@ -29,7 +29,7 @@ import pandas as pd
 import docx
 
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer, CrossEncoder
+
 from sklearn.metrics.pairwise import cosine_similarity
 
 warnings.filterwarnings("ignore")
