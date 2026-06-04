@@ -1,0 +1,1190 @@
+
+# =========================================================
+# ADVANCED AI CV SCREENING SYSTEM
+# PROFESSIONAL API READY VERSION
+# FINAL FIXED VERSION
+# =========================================================
+
+
+# =========================================================
+# IMPORTS
+# =========================================================
+
+import os
+import re
+import math
+import logging
+import warnings
+
+import numpy as np
+import pandas as pd
+import docx
+
+from pypdf import PdfReader
+from sentence_transformers import SentenceTransformer, CrossEncoder
+from sklearn.metrics.pairwise import cosine_similarity
+
+warnings.filterwarnings("ignore")
+
+# =========================================================
+# LOGGING
+# =========================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+
+logger = logging.getLogger(__name__)
+
+# =========================================================
+# CONFIGURATION
+# =========================================================
+
+class Config:
+
+    EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+
+    CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+    TOP_N_RESULTS = 9999
+
+    WEIGHTS = {
+        "semantic": 0.35,
+        "cross_encoder": 0.40,
+        "skill": 0.15,
+        "experience": 0.10
+    }
+
+    SKILL_ALIASES = {
+
+        "python": ["python", "py"],
+
+        "tensorflow": ["tensorflow", "tf"],
+
+        "pytorch": ["pytorch"],
+
+        "javascript": ["javascript", "js"],
+
+        "react": ["react", "reactjs"],
+
+        "machine learning": [
+            "machine learning",
+            "ml"
+        ],
+
+        "deep learning": [
+            "deep learning",
+            "dl"
+        ],
+
+        "nlp": [
+            "nlp",
+            "natural language processing"
+        ],
+
+        "sql": ["sql"],
+
+        "docker": ["docker"],
+
+        "kubernetes": [
+            "kubernetes",
+            "k8s"
+        ],
+
+        "aws": ["aws"],
+
+        "linux": ["linux"],
+
+        "git": ["git"],
+
+        "cybersecurity": [
+            "cybersecurity",
+            "cyber security"
+        ],
+
+        "devops": ["devops"],
+
+        "api": [
+            "api",
+            "rest api"
+        ],
+
+        "fastapi": ["fastapi"],
+
+        "django": ["django"],
+
+        "flask": ["flask"],
+
+        "java": ["java"],
+
+        "csharp": [
+            "c#",
+            ".net",
+            "asp.net"
+        ],
+
+        "html": ["html"],
+
+        "css": ["css"],
+
+        "nodejs": [
+            "nodejs",
+            "node.js"
+        ],
+
+        "mongodb": ["mongodb"],
+
+        "flutter": ["flutter"],
+
+        "firebase": ["firebase"],
+
+        "android": ["android"],
+
+        "kotlin": ["kotlin"],
+
+        "terraform": ["terraform"],
+
+        "networking": ["networking"],
+
+        "wireshark": ["wireshark"],
+
+        "nmap": ["nmap"],
+
+        "pentesting": ["pentesting"],
+
+        # --- All LookUp Skills (IDs 175-347) ---
+        "typescript": ["typescript", "ts"],
+        "bootstrap": ["bootstrap"],
+        "tailwind css": ["tailwind css", "tailwind"],
+        "sass": ["sass"],
+        "less": ["less"],
+        "angular": ["angular", "angularjs"],
+        "vue.js": ["vue.js", "vue", "vuejs"],
+        "next.js": ["next.js", "nextjs"],
+        "nuxt.js": ["nuxt.js", "nuxtjs"],
+        "svelte": ["svelte"],
+        "blazor": ["blazor"],
+        "jquery": ["jquery"],
+        "web components": ["web components"],
+        "c": ["c language"],
+        "c++": ["c++", "cpp"],
+        "php": ["php"],
+        "ruby": ["ruby"],
+        "go": ["golang", "go language"],
+        "rust": ["rust"],
+        "swift": ["swift"],
+        "dart": ["dart"],
+        "scala": ["scala"],
+        "r": ["r language", "r programming"],
+        "matlab": ["matlab"],
+        "perl": ["perl"],
+        "lua": ["lua"],
+        "groovy": ["groovy"],
+        "f#": ["f#", "fsharp"],
+        "vb.net": ["vb.net", "visual basic"],
+        "asp.net core": ["asp.net core"],
+        "asp.net mvc": ["asp.net mvc"],
+        "razor pages": ["razor pages"],
+        "blazor server": ["blazor server"],
+        "blazor webassembly": ["blazor webassembly", "blazor wasm"],
+        "entity framework core": ["entity framework core", "ef core"],
+        "dapper": ["dapper"],
+        "linq": ["linq"],
+        "ado.net": ["ado.net"],
+        "minimal apis": ["minimal apis"],
+        "signalr": ["signalr"],
+        "wpf": ["wpf"],
+        "windows forms": ["windows forms", "winforms"],
+        ".net maui": [".net maui", "maui"],
+        "xamarin": ["xamarin"],
+        "express.js": ["express.js", "express", "expressjs"],
+        "nestjs": ["nestjs", "nest.js"],
+        "fastify": ["fastify"],
+        "koa.js": ["koa.js", "koa"],
+        "spring boot": ["spring boot"],
+        "spring mvc": ["spring mvc"],
+        "spring security": ["spring security"],
+        "hibernate": ["hibernate"],
+        "jakarta ee": ["jakarta ee", "java ee"],
+        "laravel": ["laravel"],
+        "symfony": ["symfony"],
+        "codeigniter": ["codeigniter"],
+        "ruby on rails": ["ruby on rails", "rails"],
+        "gin": ["gin"],
+        "fiber": ["fiber"],
+        "rest api": ["rest api", "restful"],
+        "graphql": ["graphql"],
+        "grpc": ["grpc"],
+        "soap": ["soap"],
+        "web api": ["web api"],
+        "microservices": ["microservices"],
+        "monolithic architecture": ["monolithic architecture", "monolithic"],
+        "clean architecture": ["clean architecture"],
+        "onion architecture": ["onion architecture"],
+        "hexagonal architecture": ["hexagonal architecture"],
+        "domain-driven design": ["domain-driven design", "ddd"],
+        "cqrs": ["cqrs"],
+        "event-driven architecture": ["event-driven architecture", "event driven"],
+        "message queues": ["message queues", "message queue", "rabbitmq", "kafka"],
+        "mediatr": ["mediatr"],
+        "repository pattern": ["repository pattern"],
+        "unit of work pattern": ["unit of work"],
+        "design patterns": ["design patterns"],
+        "solid principles": ["solid principles", "solid"],
+        "object-oriented programming": ["object-oriented programming", "oop"],
+        "functional programming": ["functional programming"],
+        "data structures": ["data structures"],
+        "algorithms": ["algorithms"],
+        "system design": ["system design"],
+        "software architecture": ["software architecture"],
+        "t-sql": ["t-sql", "tsql"],
+        "pl/sql": ["pl/sql", "plsql"],
+        "microsoft sql server": ["microsoft sql server", "sql server", "mssql"],
+        "mysql": ["mysql"],
+        "postgresql": ["postgresql", "postgres"],
+        "oracle database": ["oracle database", "oracle"],
+        "sqlite": ["sqlite"],
+        "mariadb": ["mariadb"],
+        "redis": ["redis"],
+        "firebase firestore": ["firebase firestore", "firestore"],
+        "firebase realtime database": ["firebase realtime database"],
+        "elasticsearch": ["elasticsearch"],
+        "opensearch": ["opensearch"],
+        "dynamodb": ["dynamodb"],
+        "cassandra": ["cassandra"],
+        "neo4j": ["neo4j"],
+        "couchbase": ["couchbase"],
+        "influxdb": ["influxdb"],
+        "database design": ["database design"],
+        "database normalization": ["database normalization"],
+        "stored procedures": ["stored procedures"],
+        "database indexing": ["database indexing"],
+        "query optimization": ["query optimization"],
+        "database administration": ["database administration", "dba"],
+        "database backup and recovery": ["database backup and recovery"],
+        "data modeling": ["data modeling"],
+        "nosql databases": ["nosql"],
+        "relational databases": ["relational databases", "rdbms"],
+        "github": ["github"],
+        "gitlab": ["gitlab"],
+        "bitbucket": ["bitbucket"],
+        "azure devops": ["azure devops"],
+        "jira": ["jira"],
+        "trello": ["trello"],
+        "confluence": ["confluence"],
+        "agile": ["agile"],
+        "scrum": ["scrum"],
+        "kanban": ["kanban"],
+        "sdlc": ["sdlc"],
+        "code review": ["code review"],
+        "pair programming": ["pair programming"],
+        "technical documentation": ["technical documentation"],
+        "software estimation": ["software estimation"],
+        "helm": ["helm"],
+        "nginx": ["nginx"],
+        "apache http server": ["apache http server", "apache"],
+        "iis": ["iis"],
+        "ubuntu": ["ubuntu"],
+        "debian": ["debian"],
+        "red hat enterprise linux": ["red hat", "rhel"],
+        "windows server": ["windows server"],
+        "bash scripting": ["bash scripting", "bash"],
+        "powershell": ["powershell"],
+        "shell scripting": ["shell scripting"],
+        "system administration": ["system administration", "sysadmin"],
+        "virtualization": ["virtualization"],
+        "vmware": ["vmware"],
+        "hyper-v": ["hyper-v"],
+        "microsoft azure": ["microsoft azure", "azure"],
+        "google cloud platform": ["google cloud platform", "gcp"],
+        "cloud computing": ["cloud computing"],
+        "serverless computing": ["serverless computing", "serverless"],
+        "aws lambda": ["aws lambda", "lambda"],
+        "azure functions": ["azure functions"],
+        "google cloud functions": ["google cloud functions"],
+        "azure app service": ["azure app service"],
+        "azure sql database": ["azure sql database"],
+        "azure storage": ["azure storage"],
+        "amazon s3": ["amazon s3", "s3"],
+        "amazon ec2": ["amazon ec2", "ec2"],
+    }
+
+    # Skill name → ID mapping
+    SKILL_IDS = {
+        175: "C#", 176: "Java", 177: "Python", 178: "JavaScript", 179: "TypeScript", 180: "HTML", 181: "CSS",
+        182: "Bootstrap", 183: "Tailwind CSS", 184: "Sass", 185: "Less", 186: "React", 187: "Angular", 188: "Vue.js",
+        189: "Next.js", 190: "Nuxt.js", 191: "Svelte", 192: "Blazor", 193: "jQuery", 194: "Web Components", 195: "C", 196: "C++",
+        197: "PHP", 198: "Ruby", 199: "Go", 200: "Rust", 201: "Kotlin", 202: "Swift", 203: "Dart", 204: "Scala", 205: "R",
+        206: "MATLAB", 207: "Perl", 208: "Lua", 209: "Groovy", 210: "F#", 211: "VB.NET", 212: "ASP.NET Core", 213: "ASP.NET MVC",
+        214: "Razor Pages", 215: "Blazor Server", 216: "Blazor WebAssembly", 217: "Entity Framework Core", 218: "Dapper",
+        219: "LINQ", 220: "ADO.NET", 221: "Minimal APIs", 222: "SignalR", 223: "WPF", 224: "Windows Forms", 225: ".NET MAUI",
+        226: "Xamarin", 227: "Node.js", 228: "Express.js", 229: "NestJS", 230: "Fastify", 231: "Koa.js", 232: "Spring Boot",
+        233: "Spring MVC", 234: "Spring Security", 235: "Hibernate", 236: "Jakarta EE", 237: "Django", 238: "Flask",
+        239: "FastAPI", 240: "Laravel", 241: "Symfony", 242: "CodeIgniter", 243: "Ruby on Rails", 244: "Gin", 245: "Fiber",
+        246: "REST API", 247: "GraphQL", 248: "gRPC", 249: "SOAP", 250: "Web API", 251: "Microservices", 252: "Monolithic Architecture",
+        253: "Clean Architecture", 254: "Onion Architecture", 255: "Hexagonal Architecture", 256: "Domain-Driven Design",
+        257: "CQRS", 258: "Event-Driven Architecture", 259: "Message Queues", 260: "MediatR", 261: "Repository Pattern",
+        262: "Unit of Work Pattern", 263: "Design Patterns", 264: "SOLID Principles", 265: "Object-Oriented Programming",
+        266: "Functional Programming", 267: "Data Structures", 268: "Algorithms", 269: "System Design", 270: "Software Architecture",
+        271: "SQL", 272: "T-SQL", 273: "PL/SQL", 274: "Microsoft SQL Server", 275: "MySQL", 276: "PostgreSQL", 277: "Oracle Database",
+        278: "SQLite", 279: "MariaDB", 280: "MongoDB", 281: "Redis", 282: "Firebase Firestore", 283: "Firebase Realtime Database",
+        284: "Elasticsearch", 285: "OpenSearch", 286: "DynamoDB", 287: "Cassandra", 288: "Neo4j", 289: "Couchbase",
+        290: "InfluxDB", 291: "Database Design", 292: "Database Normalization", 293: "Stored Procedures", 294: "Database Indexing",
+        295: "Query Optimization", 296: "Database Administration", 297: "Database Backup and Recovery", 298: "Data Modeling",
+        299: "NoSQL Databases", 300: "Relational Databases", 301: "Git", 302: "GitHub", 303: "GitLab", 304: "Bitbucket",
+        305: "Azure DevOps", 306: "Jira", 307: "Trello", 308: "Confluence", 309: "Agile", 310: "Scrum", 311: "Kanban",
+        312: "SDLC", 313: "Code Review", 314: "Pair Programming", 315: "Technical Documentation", 316: "Software Estimation",
+        317: "Docker", 318: "Kubernetes", 319: "Helm", 320: "Nginx", 321: "Apache HTTP Server", 322: "IIS", 323: "Linux",
+        324: "Ubuntu", 325: "Debian", 326: "Red Hat Enterprise Linux", 327: "Windows Server", 328: "Bash Scripting",
+        329: "PowerShell", 330: "Shell Scripting", 331: "System Administration", 332: "Virtualization", 333: "VMware",
+        334: "Hyper-V", 335: "AWS", 336: "Microsoft Azure", 337: "Google Cloud Platform", 338: "Cloud Computing",
+        339: "Serverless Computing", 340: "AWS Lambda", 341: "Azure Functions", 342: "Google Cloud Functions",
+        343: "Azure App Service", 344: "Azure SQL Database", 345: "Azure Storage", 346: "Amazon S3", 347: "Amazon EC2"
+    }
+
+    # Maps SKILL_ALIASES keys directly to LookUp IDs
+    # Skills (MajorCode=1) use IDs 175+
+    # Requirements (MajorCode=0) use IDs 1-173
+    # Custom IDs (373+) for skills not in the original LookUp
+    SKILL_ALIAS_KEY_TO_ID = {
+        # --- Skills (MajorCode=1, IDs 175+) ---
+        "python": 177,
+        "javascript": 178,
+        "react": 186,
+        "java": 176,
+        "csharp": 175,        # C#
+        "html": 180,
+        "css": 181,
+        "nodejs": 227,        # Node.js
+        "mongodb": 280,
+        "kotlin": 201,
+        "django": 237,
+        "flask": 238,
+        "fastapi": 239,
+        "sql": 271,
+        "git": 301,
+        "docker": 317,
+        "kubernetes": 318,
+        "aws": 335,
+        "linux": 323,
+        "firebase": 282,      # Firebase Firestore
+        # --- Requirements (MajorCode=0, IDs 1-173) ---
+        "networking": 48,     # Networking Basics
+        "cybersecurity": 31,  # Cybersecurity Awareness
+        "devops": 30,         # DevOps Basics
+        "api": 25,            # API Development Knowledge
+        # --- Custom IDs (373+) for skills not in LookUp ---
+        "tensorflow": 373,
+        "pytorch": 374,
+        "machine learning": 375,
+        "deep learning": 376,
+        "nlp": 377,
+        "flutter": 378,
+        "android": 379,
+        "terraform": 380,
+        "wireshark": 381,
+        "nmap": 382,
+        "pentesting": 383,
+
+        # --- All remaining LookUp Skills (IDs 175-347) ---
+        "typescript": 179,
+        "bootstrap": 182,
+        "tailwind css": 183,
+        "sass": 184,
+        "less": 185,
+        "angular": 187,
+        "vue.js": 188,
+        "next.js": 189,
+        "nuxt.js": 190,
+        "svelte": 191,
+        "blazor": 192,
+        "jquery": 193,
+        "web components": 194,
+        "c": 195,
+        "c++": 196,
+        "php": 197,
+        "ruby": 198,
+        "go": 199,
+        "rust": 200,
+        "swift": 202,
+        "dart": 203,
+        "scala": 204,
+        "r": 205,
+        "matlab": 206,
+        "perl": 207,
+        "lua": 208,
+        "groovy": 209,
+        "f#": 210,
+        "vb.net": 211,
+        "asp.net core": 212,
+        "asp.net mvc": 213,
+        "razor pages": 214,
+        "blazor server": 215,
+        "blazor webassembly": 216,
+        "entity framework core": 217,
+        "dapper": 218,
+        "linq": 219,
+        "ado.net": 220,
+        "minimal apis": 221,
+        "signalr": 222,
+        "wpf": 223,
+        "windows forms": 224,
+        ".net maui": 225,
+        "xamarin": 226,
+        "express.js": 228,
+        "nestjs": 229,
+        "fastify": 230,
+        "koa.js": 231,
+        "spring boot": 232,
+        "spring mvc": 233,
+        "spring security": 234,
+        "hibernate": 235,
+        "jakarta ee": 236,
+        "laravel": 240,
+        "symfony": 241,
+        "codeigniter": 242,
+        "ruby on rails": 243,
+        "gin": 244,
+        "fiber": 245,
+        "rest api": 246,
+        "graphql": 247,
+        "grpc": 248,
+        "soap": 249,
+        "web api": 250,
+        "microservices": 251,
+        "monolithic architecture": 252,
+        "clean architecture": 253,
+        "onion architecture": 254,
+        "hexagonal architecture": 255,
+        "domain-driven design": 256,
+        "cqrs": 257,
+        "event-driven architecture": 258,
+        "message queues": 259,
+        "mediatr": 260,
+        "repository pattern": 261,
+        "unit of work pattern": 262,
+        "design patterns": 263,
+        "solid principles": 264,
+        "object-oriented programming": 265,
+        "functional programming": 266,
+        "data structures": 267,
+        "algorithms": 268,
+        "system design": 269,
+        "software architecture": 270,
+        "t-sql": 272,
+        "pl/sql": 273,
+        "microsoft sql server": 274,
+        "mysql": 275,
+        "postgresql": 276,
+        "oracle database": 277,
+        "sqlite": 278,
+        "mariadb": 279,
+        "redis": 281,
+        "firebase firestore": 282,
+        "firebase realtime database": 283,
+        "elasticsearch": 284,
+        "opensearch": 285,
+        "dynamodb": 286,
+        "cassandra": 287,
+        "neo4j": 288,
+        "couchbase": 289,
+        "influxdb": 290,
+        "database design": 291,
+        "database normalization": 292,
+        "stored procedures": 293,
+        "database indexing": 294,
+        "query optimization": 295,
+        "database administration": 296,
+        "database backup and recovery": 297,
+        "data modeling": 298,
+        "nosql databases": 299,
+        "relational databases": 300,
+        "github": 302,
+        "gitlab": 303,
+        "bitbucket": 304,
+        "azure devops": 305,
+        "jira": 306,
+        "trello": 307,
+        "confluence": 308,
+        "agile": 309,
+        "scrum": 310,
+        "kanban": 311,
+        "sdlc": 312,
+        "code review": 313,
+        "pair programming": 314,
+        "technical documentation": 315,
+        "software estimation": 316,
+        "helm": 319,
+        "nginx": 320,
+        "apache http server": 321,
+        "iis": 322,
+        "ubuntu": 324,
+        "debian": 325,
+        "red hat enterprise linux": 326,
+        "windows server": 327,
+        "bash scripting": 328,
+        "powershell": 329,
+        "shell scripting": 330,
+        "system administration": 331,
+        "virtualization": 332,
+        "vmware": 333,
+        "hyper-v": 334,
+        "microsoft azure": 336,
+        "google cloud platform": 337,
+        "cloud computing": 338,
+        "serverless computing": 339,
+        "aws lambda": 340,
+        "azure functions": 341,
+        "google cloud functions": 342,
+        "azure app service": 343,
+        "azure sql database": 344,
+        "azure storage": 345,
+        "amazon s3": 346,
+        "amazon ec2": 347,
+    }
+
+# =========================================================
+# CV READER - FIXED
+# =========================================================
+
+class CVReader:
+
+    @staticmethod
+    def read_file(path):
+
+        text = ""
+
+        try:
+            if path.lower().endswith(".pdf"):
+                reader = PdfReader(path)
+                text = "\n".join([
+                    page.extract_text() or ""
+                    for page in reader.pages
+                ])
+
+            elif path.lower().endswith(".docx"):
+                doc = docx.Document(path)
+                text = "\n".join([
+                    p.text for p in doc.paragraphs if p.text.strip()
+                ])
+
+            elif path.lower().endswith(".txt"):
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    text = f.read()
+
+        except Exception as e:
+            logger.error(f"Error reading {path}: {e}")
+
+        text = str(text)
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n\s*\n+", "\n", text)
+
+        return text.strip()
+
+
+# =========================================================
+# EXTRACTOR - FIXED
+# =========================================================
+
+class Extractor:
+
+    def __init__(self):
+
+        self.skill_patterns = {
+            skill: [
+                re.compile(rf"(?<![a-zA-Z0-9]){re.escape(alias)}(?![a-zA-Z0-9])", re.IGNORECASE)
+                for alias in aliases
+            ]
+            for skill, aliases in Config.SKILL_ALIASES.items()
+        }
+
+    def extract_skills(self, text):
+
+        found_skill_ids = set()
+
+        for skill, patterns in self.skill_patterns.items():
+
+            if any(pattern.search(text) for pattern in patterns):
+
+                skill_id = Config.SKILL_ALIAS_KEY_TO_ID.get(skill.lower())
+
+                if skill_id is not None:
+                    found_skill_ids.add(skill_id)
+
+        return sorted(list(found_skill_ids))
+
+    def extract_years(self, text):
+
+        lower_text = text.lower()
+        years_found = []
+
+        patterns = [
+            r"(\d{1,2})\+?\s*(?:years|yrs)\s+(?:of\s+)?experience",
+            r"experience\s*(?:of|in)?\s*(\d{1,2})\+?\s*(?:years|yrs)?"
+        ]
+
+        for pattern in patterns:
+            for x in re.findall(pattern, lower_text):
+                value = int(x)
+                if 0 <= value <= 50:
+                    years_found.append(value)
+
+        date_ranges = re.findall(
+            r"(20\d{2}|19\d{2})\s*[-–—]\s*(20\d{2}|19\d{2}|present|current|now)",
+            lower_text
+        )
+
+        current_year = 2026
+
+        for start, end in date_ranges:
+            start_year = int(start)
+            end_year = current_year if end in ["present", "current", "now"] else int(end)
+            diff = end_year - start_year
+
+            if 0 < diff <= 50:
+                years_found.append(diff)
+
+        return max(years_found) if years_found else 0
+
+
+# =========================================================
+# EDUCATION EXTRACTION - FIXED
+# =========================================================
+
+def extract_education_info(text):
+
+    education = {
+        "institution_name": None,
+        "degree": None,
+        "from_date": None,
+        "to_date": None,
+        "gpa": None
+    }
+
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    full_text = "\n".join(lines)
+    lower_text = full_text.lower()
+
+    degree_patterns = [
+        r"\b(bachelor(?:'s)?(?:\s+degree)?(?:\s+of|\s+in)?\s+[a-zA-Z\s&]+)",
+        r"\b(master(?:'s)?(?:\s+degree)?(?:\s+of|\s+in)?\s+[a-zA-Z\s&]+)",
+        r"\b(b\.?\s?sc\.?|bsc|bs)\b(?:\s+in)?\s*([a-zA-Z\s&]+)?",
+        r"\b(m\.?\s?sc\.?|msc|ms)\b(?:\s+in)?\s*([a-zA-Z\s&]+)?",
+        r"\b(ph\.?d\.?|doctorate)\b",
+        r"\b(computer science|software engineering|computer engineering|information technology|data science|cyber security|cybersecurity)\b"
+    ]
+
+    for pattern in degree_patterns:
+        match = re.search(pattern, full_text, re.IGNORECASE)
+        if match:
+            education["degree"] = re.sub(r"\s+", " ", match.group(0)).strip()
+            break
+
+    gpa_patterns = [
+        r"\b(?:gpa|cgpa|grade point average)\s*[:\-]?\s*([0-4](?:\.\d{1,3})?)\s*(?:/|out of)?\s*(4(?:\.0{1,2})?)?",
+        r"\b([0-4]\.\d{1,3})\s*/\s*4(?:\.0{1,2})?\b",
+        r"\b([0-4]\.\d{1,3})\s*out of\s*4\b"
+    ]
+
+    for pattern in gpa_patterns:
+        match = re.search(pattern, full_text, re.IGNORECASE)
+        if match:
+            gpa = float(match.group(1))
+            if 0 <= gpa <= 4:
+                education["gpa"] = gpa
+                break
+
+    university_patterns = [
+        r"\b(University\s+of\s+[A-Z][A-Za-z&.\s]{2,80})\b",
+        r"\b([A-Z][A-Za-z&.\s]{2,80}\sUniversity)\b",
+        r"\b([A-Z][A-Za-z&.\s]{2,80}\sCollege)\b",
+        r"\b([A-Z][A-Za-z&.\s]{2,80}\sInstitute)\b",
+        r"\b([A-Z][A-Za-z&.\s]{2,80}\sAcademy)\b"
+    ]
+
+    for pattern in university_patterns:
+        match = re.search(pattern, full_text)
+        if match:
+            education["institution_name"] = re.sub(r"\s+", " ", match.group(1)).strip()
+            break
+
+    date_range = re.search(
+        r"(20\d{2}|19\d{2})\s*[-–—]\s*(20\d{2}|19\d{2}|present|current)",
+        lower_text,
+        re.IGNORECASE
+    )
+
+    if date_range:
+        education["from_date"] = date_range.group(1)
+        education["to_date"] = date_range.group(2)
+    else:
+        years = re.findall(r"(20\d{2}|19\d{2})", lower_text)
+        if len(years) >= 2:
+            education["from_date"] = years[0]
+            education["to_date"] = years[1]
+
+    return education
+
+
+# =========================================================
+# EXPERIENCE EXTRACTION - FIXED
+# =========================================================
+
+def extract_experience_info(text):
+
+    experiences = []
+
+    job_titles = [
+        "software engineer",
+        "software developer",
+        "backend developer",
+        "frontend developer",
+        "full stack developer",
+        "full-stack developer",
+        "web developer",
+        "mobile developer",
+        "android developer",
+        "ios developer",
+        "devops engineer",
+        "data scientist",
+        "ai engineer",
+        "machine learning engineer",
+        "intern"
+    ]
+
+    section_keywords = [
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment",
+        "employment history",
+        "work history"
+    ]
+
+    stop_sections = [
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "languages",
+        "summary",
+        "profile"
+    ]
+
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+
+    in_experience_section = False
+    current_exp = None
+
+    date_pattern = (
+        r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)?\.?\s*"
+        r"(?:20\d{2}|19\d{2}))\s*[-–—to]+\s*"
+        r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)?\.?\s*"
+        r"(?:20\d{2}|19\d{2})|present|current|now)"
+    )
+
+    for line in lines:
+
+        lower_line = line.lower()
+
+        if any(k == lower_line for k in section_keywords):
+            in_experience_section = True
+            continue
+
+        if in_experience_section and any(s == lower_line for s in stop_sections):
+            break
+
+        found_title = None
+        for title in job_titles:
+            if title in lower_line:
+                found_title = title
+                break
+
+        date_match = re.search(date_pattern, lower_line, re.IGNORECASE)
+
+        company_name = None
+
+        company_patterns = [
+            r"(.+?)\s*[-–—|]\s*(software engineer|software developer|backend developer|frontend developer|full stack developer|web developer|mobile developer|devops engineer|intern)",
+            r"(software engineer|software developer|backend developer|frontend developer|full stack developer|web developer|mobile developer|devops engineer|intern)\s*[-–—|]\s*(.+)",
+            r"(?:at|company[:\-]?)\s*([A-Za-z0-9&.,\s]{2,60})"
+        ]
+
+        for pattern in company_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                if len(match.groups()) >= 2:
+                    possible_company = match.group(1).strip()
+                    possible_title = match.group(2).strip().lower()
+
+                    if possible_title in job_titles:
+                        company_name = possible_company
+                    else:
+                        company_name = match.group(2).strip()
+                else:
+                    company_name = match.group(1).strip()
+
+                company_name = re.sub(r"\s+", " ", company_name)
+                break
+
+        is_exp_line = in_experience_section and (found_title or date_match or company_name)
+
+        if is_exp_line:
+
+            if current_exp:
+                experiences.append(current_exp)
+
+            current_exp = {
+                "company_name": company_name,
+                "job_title": found_title,
+                "from_date": date_match.group(1).strip() if date_match else None,
+                "to_date": date_match.group(2).strip() if date_match else None,
+                "description": line,
+                "skills": Extractor().extract_skills(line)
+            }
+
+        elif current_exp and in_experience_section:
+            current_exp["description"] += " " + line
+            current_exp["skills"] = sorted(list(set(
+                current_exp.get("skills", []) + Extractor().extract_skills(line)
+            )))
+
+    if current_exp:
+        experiences.append(current_exp)
+
+    return experiences
+
+# =========================================================
+# ML SCORER
+# =========================================================
+
+class MLScorer:
+
+    def __init__(self):
+
+        logger.info("Loading NLP Models...")
+
+        self.embedder = SentenceTransformer(Config.EMBEDDING_MODEL)
+        self.cross_encoder = CrossEncoder(Config.CROSS_ENCODER_MODEL)
+
+        logger.info("Models Loaded.")
+
+    def sigmoid(self, x):
+        return 1 / (1 + math.exp(-x))
+
+    def evaluate(self, cv_text, cv_skills, cv_years, job_desc):
+
+        cv_emb = self.embedder.encode([cv_text])
+        job_emb = self.embedder.encode([job_desc])
+
+        semantic_score = float(cosine_similarity(cv_emb, job_emb)[0][0])
+        semantic_score = max(0.0, semantic_score)
+
+        cross_logit = self.cross_encoder.predict([(cv_text, job_desc)])[0]
+        cross_score = self.sigmoid(float(cross_logit))
+
+        job_skills = set(Extractor().extract_skills(job_desc))
+        cv_skills = set(cv_skills)
+
+        matched_skill_ids = sorted(list(cv_skills & job_skills))
+        missing_skill_ids = sorted(list(job_skills - cv_skills))
+
+        matched_skill_names = [
+            Config.SKILL_IDS.get(skill_id, str(skill_id))
+            for skill_id in matched_skill_ids
+        ]
+
+        missing_skill_names = [
+            Config.SKILL_IDS.get(skill_id, str(skill_id))
+            for skill_id in missing_skill_ids
+        ]
+
+        skill_score = len(matched_skill_ids) / len(job_skills) if job_skills else 0.0
+        exp_score = min(cv_years / 10.0, 1.0)
+
+        final_score = (
+            semantic_score * Config.WEIGHTS["semantic"] +
+            cross_score * Config.WEIGHTS["cross_encoder"] +
+            skill_score * Config.WEIGHTS["skill"] +
+            exp_score * Config.WEIGHTS["experience"]
+        )
+
+        return {
+            "final_score": final_score,
+            "semantic_score": semantic_score,
+            "cross_score": cross_score,
+            "matched_skill_ids": matched_skill_ids,
+            "missing_skill_ids": missing_skill_ids,
+            "matched_skill_names": matched_skill_names,
+            "missing_skill_names": missing_skill_names
+        }
+
+
+# =========================================================
+# ATS SYSTEM
+# =========================================================
+
+class ATSSystem:
+
+    def __init__(self):
+
+        self.reader = CVReader()
+        self.extractor = Extractor()
+        self.scorer = MLScorer()
+
+        self.job_profiles = {
+            "Data Scientist": """
+            Python Machine Learning Deep Learning NLP TensorFlow PyTorch SQL
+            """,
+
+            "Full Stack Developer": """
+            JavaScript React Node.js MongoDB Docker AWS SQL REST API
+            """,
+
+            "Cybersecurity Specialist": """
+            Cybersecurity Pentesting Linux Networking Wireshark Nmap
+            """,
+
+            "DevOps Engineer": """
+            Docker Kubernetes Terraform AWS Linux CI/CD
+            """,
+
+            "Mobile Developer": """
+            Flutter Kotlin Firebase Android Java
+            """
+        }
+
+    def process_folder(self, folder_path):
+
+        results = []
+
+        for root, dirs, files in os.walk(folder_path):
+
+            for file in files:
+
+                path = os.path.join(root, file)
+
+                if not os.path.isfile(path):
+                    continue
+
+                if not file.lower().endswith((".pdf", ".docx", ".txt")):
+                    continue
+
+                text = self.reader.read_file(path)
+
+                print(f"Processing: {file}")
+                print(f"Text Length: {len(text)}")
+
+                if not text:
+                    continue
+
+                text_lower = text.lower()
+
+                skills = self.extractor.extract_skills(text)
+                years = self.extractor.extract_years(text)
+
+                education = extract_education_info(text)
+                experience_data = extract_experience_info(text)
+
+                linkedin_match = re.search(
+                    r"(https?:\/\/)?(www\.)?linkedin\.com\/in\/[A-Za-z0-9_-]+",
+                    text,
+                    re.IGNORECASE
+                )
+
+                linkedin_url = linkedin_match.group(0) if linkedin_match else None
+
+                resubmission_required = len(text.strip()) < 100
+
+                best_role = None
+                best_eval = {"final_score": -1}
+                best_job_description = ""
+
+                for role, desc in self.job_profiles.items():
+
+                    eval_metrics = self.scorer.evaluate(
+                        text_lower,
+                        skills,
+                        years,
+                        desc
+                    )
+
+                    if eval_metrics["final_score"] > best_eval["final_score"]:
+                        best_role = role
+                        best_eval = eval_metrics
+                        best_job_description = desc
+
+                ai_explanation = (
+                    f"Candidate matched "
+                    f"{len(best_eval['matched_skill_ids'])} "
+                    f"required skills with "
+                    f"{years} years of experience."
+                )
+
+                results.append({
+                    "candidate": file,
+                    "position": best_role,
+                    "job_description": best_job_description,
+                    "experience": years,
+                    "skills_found_ids": skills,
+                    "skills_found_names": [
+                        Config.SKILL_IDS.get(skill_id, str(skill_id))
+                        for skill_id in skills
+                    ],
+                    "linkedin_url": linkedin_url,
+                    "resubmission_required": resubmission_required,
+                    "ai_explanation": ai_explanation,
+                    "institution_name": education["institution_name"],
+                    "degree": education["degree"],
+                    "from_date": education["from_date"],
+                    "to_date": education["to_date"],
+                    "gpa": education["gpa"],
+                    "experience_summary": experience_data,
+                    **best_eval
+                })
+
+        if len(results) == 0:
+            print("❌ No valid CVs found.")
+            return pd.DataFrame()
+
+        df = pd.DataFrame(results)
+
+        df = df.sort_values(
+            "final_score",
+            ascending=False
+        ).reset_index(drop=True)
+
+        df["rank"] = df.index + 1
+
+        return df
+
+import uuid
+import shutil
+import requests
+from typing import List, Optional
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI(title="AI CV Screening API", version="1.0.0")
+
+API_KEY = os.getenv("AI_API_KEY", "123456")
+
+ats = ATSSystem()
+
+
+class ApplicationCvPath(BaseModel):
+    AppllicationsId: int
+    CvPath: str
+
+
+class AnalyzeApplicationsRequest(BaseModel):
+    JobId: int
+    Title: Optional[str] = None
+    Description: Optional[str] = None
+    EmploymentTypeId: Optional[int] = None
+    LocationId: Optional[int] = None
+    Skills: List[int] = []
+    Requirements: List[int] = []
+    ApplicantCVsPath: List[ApplicationCvPath] = []
+    CallbackUrl: Optional[str] = None
+
+
+@app.get("/")
+def home():
+    return {"message": "AI CV API is running"}
+
+
+@app.post("/analyze-applications")
+def analyze_applications(
+    request: AnalyzeApplicationsRequest,
+    x_ai_key: str = Header(None)
+):
+    if x_ai_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid X-AI-KEY")
+
+    folder = f"temp_cvs/{request.JobId}_{uuid.uuid4().hex}"
+    os.makedirs(folder, exist_ok=True)
+
+    try:
+        for cv in request.ApplicantCVsPath:
+            response = requests.get(cv.CvPath, timeout=60)
+
+            if response.status_code != 200:
+                continue
+
+            ext = os.path.splitext(cv.CvPath.split("?")[0])[1].lower()
+
+            if ext not in [".pdf", ".docx", ".txt"]:
+                ext = ".pdf"
+
+            file_path = os.path.join(folder, f"{cv.AppllicationsId}{ext}")
+
+            with open(file_path, "wb") as f:
+                f.write(response.content)
+
+        job_description = f"""
+        {request.Title or ""}
+        {request.Description or ""}
+        Skills IDs: {request.Skills}
+        Requirements IDs: {request.Requirements}
+        """
+
+        ats.job_profiles = {
+            request.Title or "Custom Job": job_description
+        }
+
+        results_df = ats.process_folder(folder)
+
+        if results_df.empty:
+            payload = {
+                "jobId": request.JobId,
+                "success": False,
+                "message": "No CVs were processed",
+                "results": []
+            }
+        else:
+            results = []
+
+            for row in results_df.to_dict(orient="records"):
+                application_id = int(os.path.splitext(str(row["candidate"]))[0])
+
+                results.append({
+                    "applicationId": application_id,
+                    "jobId": request.JobId,
+                    "finalScore": round(float(row.get("final_score", 0)) * 100, 2),
+                    "rank": row.get("rank"),
+                    "experience": row.get("experience"),
+                    "skillsFoundIds": row.get("skills_found_ids"),
+                    "skillsFoundNames": row.get("skills_found_names"),
+                    "matchedSkillIds": row.get("matched_skill_ids"),
+                    "matchedSkillNames": row.get("matched_skill_names"),
+                    "missingSkillIds": row.get("missing_skill_ids"),
+                    "missingSkillNames": row.get("missing_skill_names"),
+                    "linkedinUrl": row.get("linkedin_url"),
+                    "resubmissionRequired": row.get("resubmission_required"),
+                    "aiExplanation": row.get("ai_explanation"),
+                    "institutionName": row.get("institution_name"),
+                    "degree": row.get("degree"),
+                    "fromDate": row.get("from_date"),
+                    "toDate": row.get("to_date"),
+                    "gpa": row.get("gpa"),
+                    "experienceSummary": row.get("experience_summary")
+                })
+
+            payload = {
+                "jobId": request.JobId,
+                "success": True,
+                "results": results
+            }
+
+        if request.CallbackUrl:
+            try:
+                requests.post(request.CallbackUrl, json=payload, timeout=60)
+            except Exception as e:
+                payload["callbackError"] = str(e)
+
+        return payload
+
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
